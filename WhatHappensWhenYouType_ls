@@ -1,0 +1,10 @@
+Linux shell will tokenize ls command and do smething like this.
+execve("/bin/ls", ["ls", "-ltr"], [/* 21 vars */]) = 0
+
+shell checks if ls execuatble is in path or it's alias.
+it does a fork system call to create a new process, this new process can share parent memory details, 
+however if anything which is not sharable will be using separate memory location, which is Copy On Write.
+Also parent process does a wait system call.
+
+Then kernel does a execve system call, to execute ls. kerenl also does a bunch of other system call such as fstat,read,write to standard output.
+Once this process finish it's job, children process sends parent signal saying this is done and now os cleans up memory, process table etc.
