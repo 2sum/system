@@ -1,0 +1,20 @@
+public key and private key used for authentication purpose and this is asymmetric encryption.
+client's public key stored in server, ~/.ssh/authorized_keys
+After symmetric encryption esatblished between server/client, server encrypts a challenge message to client.
+If client can decrypt this using private key, client authentication is done.
+At this point both party agrees on a. session key, which will be used to further encrypt message.
+
+-----
+
+Authentication using SSH key pairs begins after the symmetric encryption has been established as described in the last section. The procedure happens like this:
+
+    The client begins by sending an ID for the key pair it would like to authenticate with to the server.
+    The server check’s the authorized_keys file of the account that the client is attempting to log into for the key ID.
+    If a public key with matching ID is found in the file, the server generates a random number and uses the public key to encrypt the number.
+    The server sends the client this encrypted message.
+    If the client actually has the associated private key, it will be able to decrypt the message using that key, revealing the original number.
+    The client combines the decrypted number with the shared session key that is being used to encrypt the communication, and calculates the MD5 hash of this value.
+    The client then sends this MD5 hash back to the server as an answer to the encrypted number message.
+    The server uses the same shared session key and the original number that it sent to the client to calculate the MD5 value on its own. It compares its own calculation to the one that the client sent back. If these two values match, it proves that the client was in possession of the private key and the client is authenticated.
+
+As you can see, the asymmetry of the keys allows the server to encrypt messages to the client using the public key. The client can then prove that it holds the private key by decrypting the message correctly. The two types of encryption that are used (symmetric shared secret, and asymmetric public-private keys) are each able to leverage their specific strengths in this mo
