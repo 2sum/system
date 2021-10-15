@@ -1,0 +1,58 @@
+A general troubleshooting guide for NFS performance issues on Linux
+
+Adrien Kunysz, Wed, 23 Feb 2011 21:58:00 GMT
+
+A few weeks ago, as I was applying for a system administrator job I was asked to answer some technical questions in writing. This is one of them and I wanted to share the answer as some people might find it useful or interesting.
+
+The question:
+
+    A RedHat [sic] server has storage from a network-attached storage array mounted over NFS. Read/writes to this mount are slow. How would you go about diagnosing the issue, what commands would you use and why? If you had access to the NFS-storage system what general things could you check for here?
+
+The rest of this article is my answer, with some formatting changes and typo fixes.
+
+Short answer:
+
+    determine a simple test case illustrating the problem
+    strace and tcpdump on both sides to see what's actually happening
+    figure out what is actually slow at system call level
+    match it to the NFS request on client side
+    match it to the NFS request on server side
+
+See how deep the slowness propagates and watch for obvious problems at each step.
+
+Long answer is...longer. Feel free to skip or skim over if the above was satisfying.
+
+I don't have a NFS enabled system or a network capture containing NFS traffic on hand so details might be fuzzy but it goes like this.
+Determining a simple test case and collecting the data
+
+I would first try to determine what is actually meant by "read/write to this mount are slow". In practice I often do that by determining a minimal test case (does cat /path/to/problematic/mount/somefile show the problem? does dd if=/dev/zero of=/path/to/problematic/mount/zero bs=1M count=1 illustrate the problem appropriately?) and running it within strace -tt -T -v (in practice I generally go strace -f -tt -T -v -s4096 -o whatever.strace THE_COMMAND as having extra information might be useful and doesn't really cost anything in this case) while retrieving a network capture with tcpdump -s0 -w (in practice, I usually go tcpdump -i any -s0 -w net.cap with no filter for the same reason as explained for strace) from both the client and server side if possible (this doesn't necessarily requires access to the server, access to the switch to which it is connected may suffice although that might not always be possible either).
+
+Having a quick look for any kernel message showing up in the logs on both sides during the test may give some useful clues but let's assume there aren't any or that they are not conclusive (which is not so often the case when you can track them down in the source and have a general understanding of how it all works).
+Figuring out what is actually slow and matching it to the network capture
+
+At that point it depends what we see in the strace and tcpdump. Let's say we see the read() system calls taking an inordinately long time (another possibility could be stat() being slow but read() being fine for example).
+
+In this case I match that read() to the NFS READ queries in the network capture from the client side using wireshark and possibly tshark and some Perl depending on the complexity of the test case (if the original capture file is over a few hundred megabytes I split it into multiple chunks that I analyse individually).
+
+In the simple case where we have a clean simple test case and we ran it immediately after mounting the filesystem, the matching is quite easy as pretty much every READ matches a read(). If the test case is more intricate and there is live NFS traffic on the side, it becomes more fun as you will want to look at the context of the read(), track down the corresponding open(), find the matching LOOKUP and track down the READ based on the NFS filehandle.
+
+If there is no READ matching the problematic read(), this suggests a problem on the client side as it retrieves the data from its local cache (or maybe it times out, I mean, read() returned successfully, right? or maybe the network capture is irrelevant because taken at the wrong time, on the wrong interface,...).
+
+At this point we have the READ from the client side network capture. Using wireshark/tshark again it is very easy to match it to its response. Does the time between the READ and its response matches the time read() took to complete? If the READ is fast but the read() is slow, this suggests a problem on the client again as the server responded quickly but the client delayed either the emission of the READ or the delivery of the response to the application for some reason.
+
+Assuming the response is slow to come back, it looks like a problem either at network or server level. Time to look at the capture from the server side.
+
+We can easily match it to the one on the client side as using the unique ID of the NFS/RPC request (I can't seem to find the exact name of that field right now but if you actually have a network capture containing NFS packets, that's easy). Is there any obvious difference between the client and the server? Maybe the packet is fragmented in between? Maybe there are some packets that are lost? Maybe packets are reordered? Basically we want to look for any indication of a problem at network level. Assuming the server capture shows basically the same thing than the client capture, it's time to look at the actual server and figure out why it's slow to respond.
+
+Since you mentionned it's a (presumably non-RHEL, black box) NAS I assume I am not supposed to actually look at it in details and I will stop the drilling down at this stage.
+
+I should point out that finding a problem at "network level" might be actually indicative of a problem in the configuration of one of the hosts (sending packets larger than the MTU, using the wrong route,...).
+Alternative approaches
+
+Another possibility is to use a statistical approach and just look at /proc/sys/{sunrpc,fs/{nfs,nfsd}}/, vmstat, nfstat and try to figure out what's wrong based on the numbers you see there. If you have recorded what values you expect when it works fine I guess that could work but I must admit I haven't ever relied on this as my experience has been more focused on troubleshooting issues on systems for which I have no history, very little context and about no access. Also, this approach doesn't really show you what is happening at a low level which is often required to really understand what is going on. However it can sometimes give important clues.
+
+Running more varied tests may also help a bit by restricting the field of investigation. Does the problem happen with a particular file? With a particular directory? Only from a specific client? Only at certain times of the day? ... In general, most of this kind of contextual information is noise but it's can also give some important clues when stuck at a later stage of the investigation.
+
+Some people also have check lists (be it explicitly documented or implicitly memorised with experience) of problems they know and will just try the "solutions" for each ("let's try to increase rsize", "let's switch to UDP", "just disable MSI on the NIC",...) without really trying to understand what is happening or considering possible dangers of the "solution". I think this kind of cargo cult approach might actually be useful sometimes to quickly reduce the problem space (as described above) as the straight drilling down takes time and brain cells but at least you are making consistent progress towards an actual understanding of the problem. However, trying random things tend to lead to much frustration for performance issues and when it fails you end up basically back to square one.
+
+A third alternative approach is to increase NFS verbosity (somewhere in /proc). In my experience, it is generally unpractical on a live server as the increase in system logs verbosity will quickly slow down the system and trash the logs. If you crank up the debug level high enough I am sure you can eventually find the problem too but I have found the tcpdump approach to be much more reliable and safe (and you can still go with this method later if you suspect an actual bug in the NFS implementation, but then I still prefer kernel debuggers like crash(8) or SystemTap).
