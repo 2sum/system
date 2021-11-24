@@ -12,3 +12,9 @@
   - Un initilaized data segment, data initialized to 0, static int i will be allocated to BSS.
   - Data:  Contains initialized global, static variables which have predefined value and can't be modified its divided into read-only and read-write space
   - Text: M/c language instructions or code stored
+
+## Read Through, Write Through, Write Back:
+
+- Data written to DB and cache at same time is READ Through
+- Data written to DB bypassing the cache is write through
+- Data written to Cache only and completeion informed to user, Write to DB happens after some time or certaiin conditions met is WRITE BACK.
