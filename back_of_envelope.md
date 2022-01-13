@@ -1,4 +1,4 @@
-**For Back of Envelope calc:
+** For Back of Envelope calc:
 
 If requirement is say 100B requests a day, how do you capacity plan for a web server.
 In a day 86,400 sec , round it to 100,000 sec, which is 10**5
