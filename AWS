@@ -1,0 +1,8 @@
+Security Group: 
+- Instance level
+- stateful
+- Only ALlow Rules [By default, a Security Group denies all inbound traffic and allows all outbound traffic]
+NACL:
+- Subnet Level
+- Stateless
+- Both Allow and Deny Rules [The default NACL in a VPC allows all inbound and outbound traffic.]
