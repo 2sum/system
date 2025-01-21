@@ -1,10 +1,11 @@
 SSL Handshake: Asymmetric encryption uses public/private key
 
--	Client sends a “client hello” message. This includes client’s ssl version number, cipher settings, session specific data and other info which server needs to communicate with client using ssl
+-	Client sends a “client hello” message. This includes client’s ssl version number, cipher settings, session specific data and a random number generated for the session, which server needs to communicate with client using ssl
 -	Server responds with “server hello” message. This includes server’s ssl version number, cipher settings, session specific data, an SSL cert with a public key to client
 -	Client verifies server’s SSL cert from CA and authenticates server. If authentication succeeds , then next step, else error
--	Client creates session key and encrypt with public key and sends to server.
--	Server decrypts session key with its private key and sends acknowledgement to client encrypted with session key
+-	Client creates pre-master secret and encrypt with public key and sends to server.
+-	Both the client and server use the pre-master secret, along with the previously exchanged random numbers, to generate a session key. This session key is a symmetric key used to encrypt the actual data transmitted between the client and server.
+- Once the session key is established, both the client and server notify each other that they are ready to start using the session key to encrypt/decrypt the data being transferred.
 
 Data Transfer:
 Client and server now use above session key to encrypt/decrypt data (symmetric encryption)
